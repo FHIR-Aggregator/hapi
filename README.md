@@ -6,53 +6,37 @@ This is a quickstart guide to get you up and running with the FHIR Aggregator.
 
 * setup a virtual environment
 ```bash
-cd scripts
-pip install -r requirements.txt
 python -m venv venv
 source venv/bin/activate
+pip install -r scripts/requirements.txt
 ```
+
 
 ## dev, staging, prod
 
 * See https://github.com/FHIR-Aggregator/cloud
 
 ## local development
-* start the server in the background
-```bash
-docker compose up --detach
-```
-
-* check the server is running
-```bash
-docker compose ps
-NAME                        IMAGE                     COMMAND                  SERVICE                     CREATED         STATUS         PORTS
-hapi-fhir-jpaserver-start   hapiproject/hapi:v7.4.0   "java --class-path /…"   hapi-fhir-jpaserver-start   8 minutes ago   Up 8 minutes   0.0.0.0:8080->8080/tcp
-hapi-fhir-postgres          postgres:15-alpine        "docker-entrypoint.s…"   hapi-fhir-postgres          8 minutes ago   Up 8 minutes   5432/tcp
-```
-
-* configure the endpoint
-
-```bash
-# local
-export FHIR_BASE=http://localhost:8080/fhir/
-# deployed
-export FHIR_BASE=https://hapi.test-fhir-aggregator.org/write-fhir/
-# set the project name, used as a prefix for the bucket objects
-export PROJECT_NAME=TCGA-CHANGEME
-```
-
-* query the server
-
+* See .env-sample and setup the environment variables
+* Follow the instructions in the cloud/README.md to starr and monitor the server
+* Query the server to verify it is running:
 
 ```bash
  curl -s $FHIR_BASE'/metadata' > /dev/null && echo 'OK: server running'
 OK: server running
-
 ```
 
-* upload your data to the public bucket. See upload.sh for details.
+## load the data
 
-* create a manifest file to describe the data you want to load. See create-manifest.py for details.
+```bash
+# set the project name, used as a prefix for the bucket objects
+export PROJECT_NAME=TCGA-CHANGEME
+```
+
+
+* Upload your data to the public bucket. See scripts/upload.sh for details.
+
+* Create a manifest file to describe the data you want to load. See scripts/create-manifest.py for details.
 
 ```bash
 python create-bulk-import-request.py --help
@@ -73,15 +57,12 @@ Options:
 
 * start a job to load from a `public` bucket
 
-  * This is for open access data only
 
 ```bash
 # local
 unset AUTH
-# deployed
+# deployed, change to your credentials
 export AUTH='-u USER:PASS'
-
-
 
 curl -vvvv $AUTH --header "X-Upsert-Extistence-Check: disabled" --header "Content-Type: application/fhir+json" --header "Prefer: respond-async"  -X POST $FHIR_BASE'/$import' --data @bulk-import-request-PROJECT_NAME.json 
 
@@ -117,7 +98,7 @@ hapi-fhir-postgres          postgres:15-alpine        "docker-entrypoint.s…"  
 docker compose logs --tail 10 -f
 ```
 
-* show services running
+* show service utilization
 ```bash
 docker compose stats
 ```
@@ -130,7 +111,7 @@ python scripts/fhir-util.py count-resources
 * query resource counts:
 
 ```bash
-python fhir-util.py count-resources
+python scripts/fhir-util.py count-resources
 ```
 
 * ask the server to reindex the data (takes a while)
