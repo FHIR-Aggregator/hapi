@@ -7,6 +7,9 @@ import requests
 import yaml
 from halo import Halo
 
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+
+
 FHIR_BASE = os.getenv("FHIR_BASE", "http://localhost:8080/fhir")
 
 
@@ -14,6 +17,16 @@ FHIR_BASE = os.getenv("FHIR_BASE", "http://localhost:8080/fhir")
 def cli():
     pass
 
+
+def is_503_error(exception):
+    return isinstance(exception, requests.exceptions.RequestException) and exception.response.status_code == 503
+
+
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=10), retry=retry_if_exception(is_503_error))
+def make_request(url):
+    response = requests.get(url)
+    response.raise_for_status()
+    return response
 
 @cli.command()
 @click.option(
@@ -72,71 +85,13 @@ def count_resources(fhir_url):
             stream=sys.stderr,
         ) as spinner:
             spinner.text = f"Querying metadata"
-            response = requests.get(f"{fhir_url}metadata")
+            response = make_request(f"{fhir_url}metadata")
             if response.status_code == 200:
                 metadata = response.json()
-                resource_types = [_["type"] for _ in metadata["rest"][0]["resource"]]
+                resource_types = [_["type"] for _ in metadata["rest"][0]["resource"] if _["type"] not in ['DomainResource', 'Resource']]
                 for resource_type in resource_types:
                     spinner.text = f"Querying {resource_type}"
-                    response = requests.get(
-                        f"{fhir_url}{resource_type}?_count=0&_total=accurate"
-                    )
-                    if response.status_code == 200:
-                        total = response.json().get("total")
-                        if total:
-                            resources[resource_type] = total
-                    else:
-                        click.echo(
-                            f"Failed with status {response.status_code}: {response.text}",
-                            file=sys.stderr,
-                        )
-                        break
-            else:
-                click.echo(
-                    f"Failed with status {response.status_code}: {response.text}",
-                    file=sys.stderr,
-                )
-        # write output as yaml
-        yaml_output = yaml.dump(output, default_flow_style=False)
-        print(yaml_output)
-    except Exception as e:
-        click.echo(f"Error: {e}")
-
-
-@cli.command()
-@click.option(
-    "--fhir-url",
-    "-u",
-    default=FHIR_BASE,
-    help="Base URL of the FHIR service (e.g., 'https://fhir.example.com').",
-)
-def count_resources(fhir_url):
-    """
-    Explicitly count every resource type.
-    """
-    try:
-        # Validate the FHIR base URL
-        if not fhir_url.endswith("/"):
-            fhir_url += "/"
-
-        # Send GET request to FHIR service
-        output = {"resources": {}}
-        resources = output["resources"]
-        with Halo(
-            text="Querying",
-            spinner="line",
-            placement="right",
-            color="white",
-            stream=sys.stderr,
-        ) as spinner:
-            spinner.text = f"Querying metadata"
-            response = requests.get(f"{fhir_url}metadata")
-            if response.status_code == 200:
-                metadata = response.json()
-                resource_types = [_["type"] for _ in metadata["rest"][0]["resource"]]
-                for resource_type in resource_types:
-                    spinner.text = f"Querying {resource_type}"
-                    response = requests.get(
+                    response = make_request(
                         f"{fhir_url}{resource_type}?_count=0&_total=accurate"
                     )
                     if response.status_code == 200:
@@ -195,7 +150,7 @@ def summarize(fhir_url, resource_type):
             stream=sys.stderr,
         ) as spinner:
             spinner.text = f"Querying {resource_type}"
-            response = requests.get(
+            response = make_request(
                 f"{fhir_url}{resource_type}?_summary=summary", headers=headers
             )
             if response.status_code == 200:
