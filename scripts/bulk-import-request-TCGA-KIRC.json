@@ -62,19 +62,6 @@
       "part": [
         {
           "name": "type",
-          "valueCode": "Medication"
-        },
-        {
-          "name": "url",
-          "valueUri": "https://storage.googleapis.com/fhir-aggregator-public/TCGA-KIRC/META/Medication.ndjson"
-        }
-      ]
-    },
-    {
-      "name": "input",
-      "part": [
-        {
-          "name": "type",
           "valueCode": "Observation"
         },
         {
