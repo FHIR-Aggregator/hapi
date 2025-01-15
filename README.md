@@ -124,3 +124,19 @@ python fhir-util.py get-resource-counts
 
 ```
 
+* To delete all data on the server
+```bash
+curl -X 'POST' \
+  $FHIR_BASE \
+  -H 'accept: application/fhir+json' \
+  -H 'Content-Type: application/fhir+json' \
+  -d '{
+  "resourceType": "Parameters",
+  "parameter": [
+    {
+      "name": "expungeEverything",
+      "valueBoolean": true
+    }
+  ]
+}'
+```
